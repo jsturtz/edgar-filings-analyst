@@ -6,6 +6,9 @@
             finalize                    (structured AgentAnswer with citations)
                |
                v
+             verify --(ungrounded, 1 retry)--> agent
+               |
+               v
               END
 """
 
@@ -14,14 +17,17 @@ from __future__ import annotations
 from typing import Annotated, TypedDict
 
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from .config import get_settings
+from .grounding import check
 from .schemas import AgentAnswer
 from .tools import TOOLS
+
+MAX_VERIFY_RETRIES = 1
 
 SYSTEM_PROMPT = """You are a financial analyst answering questions about US public companies \
 strictly from their SEC 10-K filings, using the tools provided.
@@ -43,6 +49,10 @@ output), in base units (whole dollars, not millions). Cite every source you used
 class State(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
     answer: AgentAnswer | None
+    grounded: bool | None
+    grounding_reason: str | None
+    retries: int
+    retry: bool
 
 
 def build_graph(model: str | None = None):
@@ -61,21 +71,44 @@ def build_graph(model: str | None = None):
         )
         return {"answer": answer}
 
+    def verify(state: State) -> dict:
+        answer = state["answer"]
+        evidence = [m.content for m in state["messages"] if isinstance(m, ToolMessage)]
+        evidence = [e if isinstance(e, str) else str(e) for e in evidence]
+        result = check(answer.value, answer.unit, evidence)
+        update: dict = {"grounded": result.grounded, "grounding_reason": result.reason, "retry": False}
+        if not result.grounded and state.get("retries", 0) < MAX_VERIFY_RETRIES:
+            update["retry"] = True
+            update["retries"] = state.get("retries", 0) + 1
+            update["messages"] = [
+                HumanMessage(
+                    f"Verification failed: {result.reason}. Re-check with the tools and "
+                    "answer again using only retrieved or calculated numbers."
+                )
+            ]
+        return update
+
+    def after_verify(state: State) -> str:
+        return "agent" if state.get("retry") else END
+
     graph = StateGraph(State)
     graph.add_node("agent", agent)
     graph.add_node("tools", ToolNode(TOOLS))
     graph.add_node("finalize", finalize)
+    graph.add_node("verify", verify)
 
     graph.add_edge(START, "agent")
     graph.add_conditional_edges("agent", tools_condition, {"tools": "tools", END: "finalize"})
     graph.add_edge("tools", "agent")
-    graph.add_edge("finalize", END)
+    graph.add_edge("finalize", "verify")
+    graph.add_conditional_edges("verify", after_verify, {"agent": "agent", END: END})
     return graph.compile()
 
 
 def run(question: str, graph=None) -> State:
     graph = graph or build_graph()
     return graph.invoke(
-        {"messages": [HumanMessage(question)], "answer": None},
+        {"messages": [HumanMessage(question)], "answer": None, "grounded": None,
+         "grounding_reason": None, "retries": 0, "retry": False},
         config={"recursion_limit": 30},
     )

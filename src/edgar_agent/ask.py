@@ -27,6 +27,7 @@ def main() -> None:
     print(f"\nAnswer: {answer.answer}")
     if answer.value is not None:
         print(f"Value:  {answer.value:,.4g} {answer.unit or ''}")
+    print(f"Grounded: {state['grounded']} ({state['grounding_reason']})")
     print("Citations:")
     for c in answer.citations:
         where = f"{c.ticker or ''} FY{c.fiscal_year}" if c.fiscal_year else (c.ticker or "")
