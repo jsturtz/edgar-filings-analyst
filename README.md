@@ -9,6 +9,9 @@ the same model answering from memory.
 > figures in millions, and which of several revenue tags is the headline number. It also has
 > to remember the number exactly. This project measures how often it gets all of that right,
 > and how much a retrieval agent with exact-figure tools improves on it.
+>
+> **Result: 99% accuracy for the agent vs. 47% for the same model answering from memory, and
+> 100% vs. 18% on small-cap companies.**
 
 ## Why EDGAR
 
@@ -79,7 +82,33 @@ stock prices move.
 
 ### Results
 
-_First run pending. See `results/` for the latest `summary_*.md`._
+Run on 2026-10-26 with `claude-sonnet-5-5` on 149 golden questions across 20 companies.
+
+| Question type | Agent | Baseline (no retrieval) |
+| --- | --- | --- |
+| lookup | 75/75 (100%) | 25/75 (33%) |
+| derived | 54/55 (98%) | 28/55 (51%) |
+| fiscal_calendar | 19/19 (100%) | 17/19 (89%) |
+| **All** | **148/149 (99%)** | **70/149 (47%)** |
+
+| Market-cap tier | Agent | Baseline (no retrieval) |
+| --- | --- | --- |
+| mega | 40/40 (100%) | 33/40 (82%) |
+| large | 39/39 (100%) | 22/39 (56%) |
+| mid | 29/30 (97%) | 8/30 (27%) |
+| small | 40/40 (100%) | 7/40 (18%) |
+
+- **The less famous the company, the more retrieval matters.** The baseline falls from 82% on
+  mega-caps to 18% on small-caps. The agent holds at 97–100% in every tier.
+- **Even the best-known companies have a freshness gap.** The baseline couldn't answer
+  Microsoft's fiscal 2026 revenue (a 10-K filed after the model's training cutoff); the agent
+  answered it from the filing.
+- **Exact figures are where memory fails most.** The baseline got 33% of dollar-amount lookups
+  right. It does better on ratios (51%), which tolerate approximate inputs.
+- **Every agent answer passed the grounding check** (149/149), averaging 2.7 tool calls.
+- **The cost is latency:** 6.4 s per answer for the agent vs. 4.1 s for the baseline.
+
+See the caveats below before reading too much into the agent's near-perfect lookup score.
 
 ### Caveats
 
