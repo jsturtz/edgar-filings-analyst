@@ -14,9 +14,25 @@ except ImportError:  # pragma: no cover
     pass
 
 
-# Mix of fiscal calendars on purpose: Apple ends in Sept, Microsoft in June, NVIDIA and
-# Walmart in late January, Home Depot in early February, Nike in May, Costco around Labor Day.
-DEFAULT_TICKERS = ["AAPL", "MSFT", "NVDA", "WMT", "COST", "NKE", "HD", "ADBE", "JNJ", "XOM"]
+# Companies grouped by approximate market capitalization when they were picked, to test
+# whether retrieval matters more for companies a model has seen less of. Each tier mixes
+# fiscal calendars on purpose (e.g. Apple ends in Sept, Home Depot in early Feb).
+# Tiers drift as stock prices move; they are labels for the eval, not live data.
+TICKER_TIERS: dict[str, list[str]] = {
+    "mega": ["AAPL", "MSFT", "NVDA", "WMT", "HD"],  # $200B+
+    "large": ["NKE", "ADBE", "TGT", "GIS", "DE"],  # ~$10B-200B
+    "mid": ["TTC", "OLLI", "COLM", "LANC", "SMPL"],  # ~$2B-10B
+    "small": ["JOUT", "NATH", "LWAY", "WEYS", "RCKY"],  # ~$300M-2B
+}
+TIER_ORDER = list(TICKER_TIERS)
+DEFAULT_TICKERS = [t for tickers in TICKER_TIERS.values() for t in tickers]
+
+
+def tier_for(ticker: str) -> str:
+    for tier, tickers in TICKER_TIERS.items():
+        if ticker.upper() in tickers:
+            return tier
+    return "custom"
 
 
 @dataclass(frozen=True)

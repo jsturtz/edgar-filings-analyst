@@ -19,7 +19,7 @@ from datetime import date
 from pathlib import Path
 
 from edgar_agent import xbrl
-from edgar_agent.config import DEFAULT_TICKERS, get_settings
+from edgar_agent.config import DEFAULT_TICKERS, get_settings, tier_for
 from edgar_agent.sec_client import SECClient
 
 LABELS = {
@@ -31,8 +31,8 @@ LABELS = {
 
 
 def _item(id_, type_, ticker, question, expected, tolerance, sources):
-    return {"id": id_, "type": type_, "ticker": ticker, "question": question,
-            "expected": expected, "tolerance": tolerance, "sources": sources}
+    return {"id": id_, "type": type_, "ticker": ticker, "tier": tier_for(ticker),
+            "question": question, "expected": expected, "tolerance": tolerance, "sources": sources}
 
 
 def build_for(ticker: str, facts: dict, company: str) -> list[dict]:
@@ -110,7 +110,11 @@ def main() -> None:
     client = SECClient(settings.sec_user_agent, settings.cache_dir)
     rows: list[dict] = []
     for ticker in args.tickers:
-        cik, title = client.cik_for(ticker)
+        try:
+            cik, title = client.cik_for(ticker)
+        except KeyError:
+            print(f"SKIP {ticker}: not in the SEC ticker list (delisted or renamed?)")
+            continue
         facts = client.companyfacts(cik)
         company = facts.get("entityName") or title
         built = build_for(ticker.upper(), facts, company)

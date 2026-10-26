@@ -29,7 +29,11 @@ def ingest(tickers: list[str], years: int) -> None:
     manifest: dict[str, list[dict]] = {}
 
     for ticker in tickers:
-        cik, company = client.cik_for(ticker)
+        try:
+            cik, company = client.cik_for(ticker)
+        except KeyError:
+            print(f"SKIP {ticker}: not in the SEC ticker list (delisted or renamed?)")
+            continue
         facts = client.companyfacts(cik)  # cached on disk for the agent's XBRL tool
         manifest[ticker] = []
         for filing in client.annual_reports(cik, limit=years):

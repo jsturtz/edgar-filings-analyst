@@ -18,14 +18,15 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
-from edgar_agent.baseline import build_baseline
+from edgar_agent.config import TIER_ORDER, tier_for
 from edgar_agent.grading import grade
-from edgar_agent.graph import build_graph, run
 
 RESULTS = Path("results")
 
 
 def _run_agent(graph, item: dict) -> dict:
+    from edgar_agent.graph import run
+
     state = run(item["question"], graph)
     ans = state["answer"]
     tool_calls = sum(len(getattr(m, "tool_calls", []) or []) for m in state["messages"])
@@ -40,7 +41,8 @@ def _run_baseline(answer_fn, item: dict) -> dict:
 
 def evaluate_one(system: str, runner, item: dict) -> dict:
     started = time.perf_counter()
-    row = {"id": item["id"], "type": item["type"], "ticker": item["ticker"], "system": system,
+    row = {"id": item["id"], "type": item["type"], "ticker": item["ticker"],
+           "tier": item.get("tier", "unknown"), "system": system,
            "question": item["question"], "expected": item["expected"]}
     try:
         row.update(runner(item))
@@ -53,28 +55,40 @@ def evaluate_one(system: str, runner, item: dict) -> dict:
     return row
 
 
+def _cell(rows: list[dict]) -> str:
+    if not rows:
+        return "–"
+    ok = sum(r["correct"] for r in rows)
+    return f"{ok}/{len(rows)} ({ok / len(rows):.0%})"
+
+
+def _table(title: str, header: str, groups: list[str], key: str, rows: list[dict], systems: list[str]) -> list[str]:
+    lines = [f"### {title}", "", f"| {header} | " + " | ".join(systems) + " |",
+             "| --- | " + " | ".join("---" for _ in systems) + " |"]
+    for g in groups:
+        cells = [_cell([r for r in rows if r["system"] == s and (g == "ALL" or r[key] == g)]) for s in systems]
+        if all(c == "–" for c in cells):
+            continue
+        lines.append(f"| {'**All**' if g == 'ALL' else g} | " + " | ".join(cells) + " |")
+    return lines + [""]
+
+
 def summarize(rows: list[dict], model: str, n_items: int) -> str:
-    by = defaultdict(list)
-    for r in rows:
-        by[(r["system"], r["type"])].append(r)
-        by[(r["system"], "ALL")].append(r)
+    for r in rows:  # results from before tiers existed get labeled from the ticker
+        if r.get("tier") in (None, "unknown"):
+            r["tier"] = tier_for(r["ticker"])
     systems = sorted({r["system"] for r in rows})
     types = ["lookup", "derived", "fiscal_calendar", "ALL"]
+    present_tiers = {r.get("tier", "unknown") for r in rows}
+    tiers = [t for t in TIER_ORDER if t in present_tiers] + sorted(present_tiers - set(TIER_ORDER)) + ["ALL"]
 
     lines = [f"# Eval run — {datetime.now():%Y-%m-%d %H:%M}", "",
-             f"Model: `{model}` · {n_items} golden questions", "",
-             "| Question type | " + " | ".join(systems) + " |",
-             "| --- | " + " | ".join("---" for _ in systems) + " |"]
-    for t in types:
-        cells = []
-        for s in systems:
-            rs = by.get((s, t), [])
-            cells.append(f"{sum(r['correct'] for r in rs)}/{len(rs)} ({sum(r['correct'] for r in rs) / len(rs):.0%})" if rs else "–")
-        lines.append(f"| {'**All**' if t == 'ALL' else t} | " + " | ".join(cells) + " |")
+             f"Model: `{model}` · {n_items} golden questions", ""]
+    lines += _table("Accuracy by question type", "Question type", types, "type", rows, systems)
+    lines += _table("Accuracy by market-cap tier", "Tier", tiers, "tier", rows, systems)
 
-    lines.append("")
     for s in systems:
-        rs = by[(s, "ALL")]
+        rs = [r for r in rows if r["system"] == s]
         lat = sum(r["latency_s"] for r in rs) / len(rs)
         errs = sum("error" in r for r in rs)
         extra = ""
@@ -91,21 +105,35 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--golden", default="eval/golden.jsonl")
     parser.add_argument("--systems", nargs="+", default=["baseline", "agent"], choices=["baseline", "agent"])
+    parser.add_argument("--tiers", nargs="+", help="only run these market-cap tiers, e.g. --tiers mid small")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--model")
+    parser.add_argument("--summarize", metavar="RUN_JSONL",
+                        help="re-print the summary for an existing results/run_*.jsonl without calling any models")
     args = parser.parse_args()
 
+    if args.summarize:
+        rows = [json.loads(line) for line in Path(args.summarize).read_text().splitlines() if line.strip()]
+        print(summarize(rows, "(from saved run)", len({r["id"] for r in rows})))
+        return
+
     items = [json.loads(line) for line in Path(args.golden).read_text().splitlines() if line.strip()]
+    if args.tiers:
+        items = [i for i in items if i.get("tier") in args.tiers]
     items = items[: args.limit] if args.limit else items
 
     from edgar_agent.config import get_settings
     model = args.model or get_settings().model
     runners = {}
     if "agent" in args.systems:
+        from edgar_agent.graph import build_graph
+
         graph = build_graph(model)
         runners["agent"] = lambda item: _run_agent(graph, item)
     if "baseline" in args.systems:
+        from edgar_agent.baseline import build_baseline
+
         answer_fn = build_baseline(model)
         runners["baseline"] = lambda item: _run_baseline(answer_fn, item)
 

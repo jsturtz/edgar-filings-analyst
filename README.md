@@ -69,7 +69,13 @@ figures. Derived answers (margins, growth) are computed in Python, never by an L
 
 `eval/run_eval.py` runs every question through **(a) the agent** and **(b) a no-retrieval
 baseline**: the same model and output schema, answering from memory. It reports accuracy by
-question type, grounding rate, tool calls and latency.
+question type and by **market-cap tier**, plus grounding rate, tool calls and latency.
+
+The 20 default companies fall into four tiers by approximate market capitalization when they
+were picked: mega ($200B+), large, mid and small (~$300M–2B). The hypothesis: a model's memory
+is good for the most-discussed companies and degrades down the tiers, so retrieval matters
+most for the long tail. Tiers are labels for the eval, not live data, and will drift as
+stock prices move.
 
 ### Results
 
@@ -95,7 +101,7 @@ Requires Python 3.11+ and [uv](https://docs.astral.sh/uv/).
 cp .env.example .env          # add ANTHROPIC_API_KEY and SEC_USER_AGENT ("Name email@example.com")
 uv sync
 
-# 1. Download and index 3 years of 10-Ks for the default 10 companies (~10 minutes the first time)
+# 1. Download and index 3 years of 10-Ks for the 20 default companies (~20 minutes the first time)
 uv run python -m edgar_agent.ingest --years 3
 
 # 2. Ask a question
@@ -105,6 +111,7 @@ uv run python -m edgar_agent.ask "What was Home Depot's gross margin in fiscal 2
 uv run python eval/build_golden.py
 uv run python eval/run_eval.py --limit 10     # smoke test
 uv run python eval/run_eval.py                # full run, agent vs. baseline
+uv run python eval/run_eval.py --tiers mid small   # only some market-cap tiers
 
 # Unit tests (parsing, XBRL lookup, grounding, grading)
 uv run pytest
