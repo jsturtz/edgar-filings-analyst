@@ -1,0 +1,8 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "edgar_analyst": "./src/edgar_agent/server.py:graph"
+  },
+  "env": ".env",
+  "python_version": "3.12"
+}

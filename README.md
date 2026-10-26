@@ -120,6 +120,20 @@ uv run pytest
 Set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` in `.env` to trace every agent run in
 LangSmith.
 
+### Run as a server (LangGraph Studio)
+
+```bash
+uv run langgraph dev
+```
+
+This serves the graph over HTTP (configured in `langgraph.json`) and opens LangGraph Studio,
+where you can send a question and watch it move through agent → tools → finalize → verify.
+Input: `{"messages": [{"role": "user", "content": "What was Toro's revenue in fiscal 2024?"}]}`.
+
+The same config works with `langgraph up` (Docker) or LangSmith Deployment. Those
+environments need the `data/` directory (Chroma index and SEC cache) made available to the
+container, or a fresh ingest run inside it.
+
 ## Layout
 
 ```
@@ -130,6 +144,7 @@ src/edgar_agent/
   ingest.py       download, chunk, embed into Chroma
   tools.py        agent tools
   graph.py        LangGraph workflow (agent -> tools -> finalize -> verify)
+  server.py       graph entry point for LangGraph Server (langgraph.json)
   grounding.py    deterministic number-in-evidence check
   schemas.py      AgentAnswer / Citation (Pydantic)
   baseline.py     no-retrieval control
@@ -145,4 +160,3 @@ tests/            unit tests with fixture 10-K HTML and companyfacts JSON
 - Text questions ("why did gross margin change?") graded against hand-written key facts with an LLM judge
 - Hybrid retrieval (BM25 + embeddings) and reranking for table-heavy passages
 - 10-Q and 8-K ingestion to test freshness on events after a model's training cutoff
-- Docker Compose for one-command setup
