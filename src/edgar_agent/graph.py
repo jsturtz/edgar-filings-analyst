@@ -17,13 +17,14 @@ from __future__ import annotations
 from typing import Annotated, TypedDict
 
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from .config import get_settings
 from .grounding import check
+from .messages import strip_thinking_blocks
 from .schemas import AgentAnswer
 from .tools import TOOLS
 
@@ -67,8 +68,16 @@ def build_graph(model: str | None = None):
         return {"messages": [response]}
 
     def finalize(state: State) -> dict:
+        history = []
+        for m in state["messages"]:
+            if isinstance(m, AIMessage):
+                content = strip_thinking_blocks(m.content)
+                if not content and not m.tool_calls:
+                    continue  # a turn that was only thinking
+                m = m.model_copy(update={"content": content})
+            history.append(m)
         answer = structured.invoke(
-            [SystemMessage(SYSTEM_PROMPT), *state["messages"], HumanMessage(FINALIZE_PROMPT)]
+            [SystemMessage(SYSTEM_PROMPT), *history, HumanMessage(FINALIZE_PROMPT)]
         )
         return {"answer": answer}
 
