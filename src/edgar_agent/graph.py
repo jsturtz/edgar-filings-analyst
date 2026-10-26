@@ -57,9 +57,10 @@ class State(TypedDict):
 
 def build_graph(model: str | None = None):
     settings = get_settings()
-    llm = ChatAnthropic(model=model or settings.model, temperature=0, max_tokens=2048)
+    # Newer Claude models reject non-default temperature, so we leave sampling at the default.
+    llm = ChatAnthropic(model=model or settings.model, max_tokens=2048)
     llm_with_tools = llm.bind_tools(TOOLS)
-    structured = llm.with_structured_output(AgentAnswer)
+    structured = llm.with_structured_output(AgentAnswer, method="json_schema")
 
     def agent(state: State) -> dict:
         response = llm_with_tools.invoke([SystemMessage(SYSTEM_PROMPT), *state["messages"]])

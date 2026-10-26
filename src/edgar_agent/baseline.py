@@ -18,8 +18,8 @@ Cite source as model_knowledge."""
 
 
 def build_baseline(model: str | None = None):
-    llm = ChatAnthropic(model=model or get_settings().model, temperature=0, max_tokens=1024)
-    structured = llm.with_structured_output(AgentAnswer)
+    llm = ChatAnthropic(model=model or get_settings().model, max_tokens=1024)
+    structured = llm.with_structured_output(AgentAnswer, method="json_schema")
 
     def answer(question: str) -> AgentAnswer:
         return structured.invoke([SystemMessage(BASELINE_PROMPT), HumanMessage(question)])
