@@ -39,6 +39,7 @@ def tier_for(ticker: str) -> str:
 class Settings:
     sec_user_agent: str
     data_dir: Path
+    provider: str
     chroma_dir: Path
     model: str
     embedding_model: str
@@ -51,12 +52,16 @@ class Settings:
 
 def get_settings() -> Settings:
     data_dir = Path(os.getenv("EDGAR_DATA_DIR", "data"))
+    provider = os.getenv("LLM_PROVIDER", "anthropic").strip().lower()
     return Settings(
         # The SEC blocks requests without a descriptive User-Agent that includes contact info.
         sec_user_agent=os.getenv("SEC_USER_AGENT", ""),
         data_dir=data_dir,
+        provider=provider,
         chroma_dir=Path(os.getenv("CHROMA_DIR", str(data_dir / "chroma"))),
-        model=os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5"),
+        # For Azure OpenAI the "model" is the name of your deployment in the Azure resource.
+        model=(os.getenv("AZURE_OPENAI_DEPLOYMENT", "") if provider == "azure_openai"
+               else os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")),
         embedding_model=os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"),
         top_k=int(os.getenv("RETRIEVAL_TOP_K", "5")),
     )

@@ -5,10 +5,9 @@ This is the control in every eval: the agent has to beat it to justify its exist
 
 from __future__ import annotations
 
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from .config import get_settings
+from .llm import chat_model, structured_output_method
 from .schemas import AgentAnswer
 
 BASELINE_PROMPT = """You are a financial analyst. Answer the question about a US public \
@@ -18,8 +17,8 @@ Cite source as model_knowledge."""
 
 
 def build_baseline(model: str | None = None):
-    llm = ChatAnthropic(model=model or get_settings().model, max_tokens=1024)
-    structured = llm.with_structured_output(AgentAnswer, method="json_schema")
+    llm = chat_model(model, max_tokens=1024)
+    structured = llm.with_structured_output(AgentAnswer, method=structured_output_method())
 
     def answer(question: str) -> AgentAnswer:
         return structured.invoke([SystemMessage(BASELINE_PROMPT), HumanMessage(question)])

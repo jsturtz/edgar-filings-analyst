@@ -16,14 +16,13 @@ from __future__ import annotations
 
 from typing import Annotated, TypedDict
 
-from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 
-from .config import get_settings
 from .grounding import check
+from .llm import chat_model, structured_output_method
 from .messages import strip_thinking_blocks
 from .schemas import AgentAnswer
 from .tools import TOOLS
@@ -57,11 +56,9 @@ class State(TypedDict):
 
 
 def build_graph(model: str | None = None):
-    settings = get_settings()
-    # Newer Claude models reject non-default temperature, so we leave sampling at the default.
-    llm = ChatAnthropic(model=model or settings.model, max_tokens=2048)
+    llm = chat_model(model, max_tokens=2048)
     llm_with_tools = llm.bind_tools(TOOLS)
-    structured = llm.with_structured_output(AgentAnswer, method="json_schema")
+    structured = llm.with_structured_output(AgentAnswer, method=structured_output_method())
 
     def agent(state: State) -> dict:
         response = llm_with_tools.invoke([SystemMessage(SYSTEM_PROMPT), *state["messages"]])

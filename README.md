@@ -149,6 +149,27 @@ uv run pytest
 Set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` in `.env` to trace every agent run in
 LangSmith.
 
+### Model providers
+
+The agent runs on **Anthropic** (default) or **Azure OpenAI**, selected with one setting:
+
+```bash
+# .env
+LLM_PROVIDER=azure_openai
+AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com/
+AZURE_OPENAI_API_KEY=...
+AZURE_OPENAI_DEPLOYMENT=<your deployment name>
+OPENAI_API_VERSION=2024-10-21
+```
+
+The graph, tools, grounding check and eval are identical across providers, so the same golden
+set compares models directly. A cheap check of a new provider:
+
+```bash
+uv run python -m edgar_agent.ask "What was Toro's revenue in fiscal 2024?"
+uv run python eval/run_eval.py --systems agent --limit 10
+```
+
 ### Run as a server (LangGraph Studio)
 
 ```bash
@@ -173,6 +194,7 @@ src/edgar_agent/
   ingest.py       download, chunk, embed into Chroma
   tools.py        agent tools
   graph.py        LangGraph workflow (agent -> tools -> finalize -> verify)
+  llm.py          chat model factory (Anthropic or Azure OpenAI)
   server.py       graph entry point for LangGraph Server (langgraph.json)
   grounding.py    deterministic number-in-evidence check
   schemas.py      AgentAnswer / Citation (Pydantic)

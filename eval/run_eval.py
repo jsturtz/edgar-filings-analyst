@@ -144,7 +144,7 @@ def main() -> None:
     RESULTS.mkdir(exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     (RESULTS / f"run_{stamp}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
-    summary = summarize(rows, model, len(items))
+    summary = summarize(rows, f"{get_settings().provider} / {model}", len(items))
     (RESULTS / f"summary_{stamp}.md").write_text(summary)
     print(summary)
 
