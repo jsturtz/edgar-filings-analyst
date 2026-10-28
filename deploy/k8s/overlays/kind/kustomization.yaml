@@ -1,0 +1,26 @@
+# Local kind cluster: use the image loaded with `kind load docker-image`, and ingest a small
+# subset (one company per market-cap tier) so the demo finishes in a few minutes.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: edgar-analyst
+    newName: edgar-analyst
+    newTag: dev
+configMapGenerator:
+  - name: edgar-config
+    behavior: merge
+    literals:
+      - INGEST_ARGS=--tickers AAPL NKE TTC JOUT --years 2
+patches:
+  - target: {kind: Deployment, name: edgar-api}
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent
+  - target: {kind: Job, name: edgar-ingest}
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: IfNotPresent

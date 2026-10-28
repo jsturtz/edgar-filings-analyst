@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: edgar
+labels:
+  - pairs:
+      app.kubernetes.io/name: edgar-analyst
+    includeSelectors: false
+    includeTemplates: true
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - ingest-job.yaml
+  - deployment.yaml
+  - service.yaml
+# Non-secret settings. API keys come from the edgar-secrets Secret, created from .env.
+configMapGenerator:
+  - name: edgar-config
+    literals:
+      - LLM_PROVIDER=anthropic
+      - ANTHROPIC_MODEL=claude-sonnet-5-5
+      - EDGAR_DATA_DIR=/data
+      - RETRIEVAL_TOP_K=5
+      - INGEST_ARGS=--years 3
+images:
+  - name: edgar-analyst
+    newName: edgar-analyst
+    newTag: latest

@@ -1,0 +1,12 @@
+# A stable in-cluster address (edgar-api.edgar.svc) that load-balances across Ready API pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: edgar-api
+spec:
+  selector:
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

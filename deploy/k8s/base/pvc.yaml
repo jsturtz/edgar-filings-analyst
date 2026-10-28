@@ -1,0 +1,10 @@
+# A disk that outlives pods. Ingest writes the Chroma index and SEC cache here; the API reads them.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: edgar-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi

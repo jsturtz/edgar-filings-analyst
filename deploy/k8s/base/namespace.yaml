@@ -1,0 +1,5 @@
+# Everything for this app lives in its own namespace, so it can be inspected and deleted as a unit.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: edgar

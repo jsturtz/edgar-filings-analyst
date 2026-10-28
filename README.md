@@ -208,6 +208,16 @@ docker run --rm --env-file .env --user "$(id -u):$(id -g)" -v "$PWD/data:/data" 
 non-root `app` user). `docker run --env-file` doesn't strip quotes, so write `.env` values
 without them.
 
+### Run on Kubernetes
+
+```bash
+make kind-up image secret deploy   # local kind cluster: ingest Job + API Deployment
+make status                        # API is Running but not Ready until ingest finishes
+make port-forward                  # then curl localhost:8000/ask
+```
+
+See [`docs/kubernetes.md`](docs/kubernetes.md) for what each manifest does and how to debug.
+
 ### Run as a server (LangGraph Studio)
 
 ```bash
