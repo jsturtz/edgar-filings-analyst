@@ -173,6 +173,22 @@ uv run python -m edgar_agent.ask "What was Toro's revenue in fiscal 2024?"
 uv run python eval/run_eval.py --systems agent --limit 10
 ```
 
+### Run as an API
+
+```bash
+uv run uvicorn edgar_agent.api:app --port 8000
+curl localhost:8000/readyz
+curl -X POST localhost:8000/ask -H 'content-type: application/json' \
+  -d '{"question": "What was Toro'"'"'s revenue in fiscal 2024?"}'
+```
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /ask` | Structured answer, citations, grounding result, tool-call count, latency |
+| `GET /healthz` | Liveness: the process is up |
+| `GET /readyz` | Readiness: 503 until ingest has built the vector index and SEC cache |
+| `GET /metrics` | Prometheus metrics: request outcomes, latency, grounded vs. ungrounded answers, tool calls, provider |
+
 ### Run as a server (LangGraph Studio)
 
 ```bash
@@ -199,6 +215,7 @@ src/edgar_agent/
   graph.py        LangGraph workflow (agent -> tools -> finalize -> verify)
   llm.py          chat model factory (Anthropic or Azure OpenAI)
   server.py       graph entry point for LangGraph Server (langgraph.json)
+  api.py          FastAPI service: /ask, health probes, Prometheus metrics
   grounding.py    deterministic number-in-evidence check
   schemas.py      AgentAnswer / Citation (Pydantic)
   baseline.py     no-retrieval control

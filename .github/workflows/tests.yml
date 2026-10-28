@@ -8,4 +8,4 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       # Unit tests cover the pure modules (parsing, XBRL, grounding, grading), so CI
       # skips the heavy model/vector-store dependencies.
-      - run: uv run --no-project --python 3.12 --with pytest --with beautifulsoup4 --with lxml --with requests --with pydantic pytest -q
+      - run: uv run --no-project --python 3.12 --with pytest --with beautifulsoup4 --with lxml --with requests --with pydantic --with fastapi --with httpx --with prometheus-client pytest -q
