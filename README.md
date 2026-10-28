@@ -189,6 +189,25 @@ curl -X POST localhost:8000/ask -H 'content-type: application/json' \
 | `GET /readyz` | Readiness: 503 until ingest has built the vector index and SEC cache |
 | `GET /metrics` | Prometheus metrics: request outcomes, latency, grounded vs. ungrounded answers, tool calls, provider |
 
+### Run in Docker
+
+```bash
+docker build -t edgar-analyst:dev .
+docker image ls edgar-analyst:dev          # CPU-only PyTorch keeps this to a few GB
+
+# Serve the API against your existing data/ folder
+docker run --rm -p 8000:8000 --env-file .env \
+  --user "$(id -u):$(id -g)" -v "$PWD/data:/data" edgar-analyst:dev
+
+# The same image runs ingest
+docker run --rm --env-file .env --user "$(id -u):$(id -g)" -v "$PWD/data:/data" \
+  edgar-analyst:dev python -m edgar_agent.ingest --years 3
+```
+
+`--user` lets the container write to your `data/` folder (the image's own user is a
+non-root `app` user). `docker run --env-file` doesn't strip quotes, so write `.env` values
+without them.
+
 ### Run as a server (LangGraph Studio)
 
 ```bash

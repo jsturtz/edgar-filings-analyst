@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+.env
+.env.*
+data/
+results/
+.langgraph_api/
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+docs/
+deploy/
+infra/
