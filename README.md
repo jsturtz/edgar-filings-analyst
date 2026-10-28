@@ -82,7 +82,10 @@ stock prices move.
 
 ### Results
 
-Run on 2026-10-26 with `claude-sonnet-5-5` on 149 golden questions across 20 companies.
+Run on 2026-10-26 with `claude-sonnet-5-5` on the 149 golden questions in
+[`eval/golden.jsonl`](eval/golden.jsonl) across 20 companies. Raw per-question results:
+[`results/run_20261026_122513.jsonl`](results/run_20261026_122513.jsonl). Re-print these tables
+without calling any models: `uv run python eval/run_eval.py --summarize results/run_20261026_122513.jsonl`.
 
 | Question type | Agent | Baseline (no retrieval) |
 | --- | --- | --- |
