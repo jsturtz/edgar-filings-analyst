@@ -208,6 +208,9 @@ tests/            unit tests with fixture 10-K HTML and companyfacts JSON
 
 ## Roadmap
 
+The next phase (FastAPI service, Kubernetes, multicloud model providers, Terraform on Azure) is planned step by step in [`docs/PLATFORM_ROADMAP.md`](docs/PLATFORM_ROADMAP.md).
+
+
 - Text questions ("why did gross margin change?") graded against hand-written key facts with an LLM judge
 - Hybrid retrieval (BM25 + embeddings) and reranking for table-heavy passages
 - 10-Q and 8-K ingestion to test freshness on events after a model's training cutoff
