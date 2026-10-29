@@ -132,7 +132,7 @@ and `/readyz` returns 200 using the existing local data.
 - `docs/kubernetes.md`: what each manifest does and why, how to run, how to debug
   (`kubectl describe`, `kubectl logs`, `kubectl get events`).
 
-**Acceptance:** `make kind-up image secret deploy ingest`, then the API pod is
+**Acceptance:** `make kind-up image secret deploy`, then `make ingest-logs`; the API pod is
 `Running` and `Ready` (it should be *not Ready* until ingest completes; show that). Then
 `make port-forward` and the `/ask` curl from A1 works through the cluster.
 
