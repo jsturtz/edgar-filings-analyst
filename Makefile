@@ -4,7 +4,7 @@ CLUSTER ?= edgar
 NS      ?= edgar
 OVERLAY ?= deploy/k8s/overlays/kind
 
-.PHONY: help kind-up image secret deploy ingest-logs reingest status port-forward logs kind-down
+.PHONY: help kind-up image secret deploy ingest-logs reingest status port-forward logs kind-down metrics-server rollout-status history break-config break-image rollback resync load watch
 
 help:  ## Show targets
 	@grep -E "^[a-z-]+:.*##" $(MAKEFILE_LIST) | sed "s/:.*##/:/"
@@ -39,6 +39,43 @@ port-forward:  ## Reach the API at localhost:8000
 
 logs:  ## Follow API logs
 	kubectl -n $(NS) logs -f deploy/edgar-api
+
+# ---- A4: rollouts, rollback and autoscaling ------------------------------------------
+METRICS_SERVER ?= https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.7.2/components.yaml
+
+metrics-server:  ## Install metrics-server (needed by the HPA); kind needs --kubelet-insecure-tls
+	kubectl apply -f $(METRICS_SERVER)
+	kubectl -n kube-system patch deployment metrics-server --type=json \
+	  -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+	kubectl -n kube-system rollout status deployment/metrics-server --timeout=120s
+
+rollout-status:  ## Watch the current rollout (fails after progressDeadlineSeconds)
+	kubectl -n $(NS) rollout status deploy/edgar-api --timeout=240s
+
+history:  ## Revisions of the API Deployment
+	kubectl -n $(NS) rollout history deploy/edgar-api
+
+break-config:  ## Ship a bad config: new pod runs but never becomes Ready (points at an empty data dir)
+	kubectl -n $(NS) annotate deploy/edgar-api kubernetes.io/change-cause="bad config: EDGAR_DATA_DIR points at an empty dir" --overwrite
+	kubectl -n $(NS) set env deploy/edgar-api EDGAR_DATA_DIR=/tmp/empty-data
+
+break-image:  ## Ship a tag that doesn't exist: new pod can't even start
+	kubectl -n $(NS) annotate deploy/edgar-api kubernetes.io/change-cause="bad image tag" --overwrite
+	kubectl -n $(NS) set image deploy/edgar-api api=edgar-analyst:does-not-exist
+
+rollback:  ## Roll back to the previous revision
+	kubectl -n $(NS) rollout undo deploy/edgar-api
+	kubectl -n $(NS) rollout status deploy/edgar-api --timeout=240s
+
+resync:  ## Re-apply the manifests so the cluster matches git again (undo kubectl set drift)
+	kubectl apply -k $(OVERLAY)
+
+load:  ## Generate CPU load for the HPA (hits /readyz, which runs a vector-store lookup; no model calls)
+	kubectl -n $(NS) run load --rm -it --restart=Never --image=busybox:1.36 -- \
+	  /bin/sh -c 'while true; do wget -q -O- http://edgar-api/readyz >/dev/null; done'
+
+watch:  ## Live view of pods and the autoscaler
+	kubectl -n $(NS) get pods,hpa -w
 
 kind-down:  ## Delete the cluster (and everything in it)
 	kind delete cluster --name $(CLUSTER)

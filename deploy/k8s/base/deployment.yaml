@@ -5,6 +5,8 @@ metadata:
   name: edgar-api
 spec:
   replicas: 1
+  revisionHistoryLimit: 5      # old ReplicaSets kept for `kubectl rollout undo`
+  progressDeadlineSeconds: 180 # a rollout with no Ready new pod for 3 minutes is marked failed
   strategy:
     type: RollingUpdate
     rollingUpdate:

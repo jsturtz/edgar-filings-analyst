@@ -66,3 +66,51 @@ changes the image registry and storage class without copying the base.
 Notes: the API and the ingest Job share a `ReadWriteOnce` volume, which works because a kind
 cluster has one node. On multi-node clusters, either schedule them together or have ingest
 publish the index somewhere shared, like object storage or a vector database service.
+
+## Rollouts, rollback and autoscaling
+
+A Deployment never edits pods in place. Every change to the pod template (image, env,
+resources) creates a **new ReplicaSet**, and the Deployment shifts pods from the old one to the
+new one. Old ReplicaSets are kept (`revisionHistoryLimit: 5`), which is what makes rollback
+instant. With `maxUnavailable: 0`, an old pod is only removed after a new pod is **Ready**,
+so a bad release can't take the service down.
+
+### How a bad deploy is contained (try it)
+
+Open a second terminal with `make watch`, then:
+
+```bash
+make history          # revision 1: what you deployed in A3
+make break-config     # new revision: same image, EDGAR_DATA_DIR points at an empty directory
+make rollout-status   # waits... then reports the rollout has exceeded its progress deadline
+make status           # two API pods: the OLD one 1/1 Ready, the NEW one Running 0/1
+curl -X POST localhost:8000/ask ...   # still answers: the Service only routes to Ready pods
+make rollback         # back to the previous revision; the broken pod is removed
+make history          # the "bad config" revision is in the history, with its change-cause
+```
+
+What you should see in `make watch`: the new pod starts, its readiness probe keeps returning
+503 ("SEC cache ... is empty; run ingest"), the old pod is never terminated, and after 180 s
+(`progressDeadlineSeconds`) the Deployment's `Progressing` condition turns false. That
+condition is what a CI/CD pipeline watches to fail a deploy automatically.
+
+`make break-image` is the other common failure: a tag that doesn't exist gives
+`ErrImageNeverPull` or `ImagePullBackOff`. It's contained the same way, and recovered with `make rollback`.
+
+`kubectl set env` and `kubectl set image` change the live cluster but not git. After
+experimenting, `make resync` re-applies the manifests so the cluster matches the repo again.
+In a real team, the manifests in git (or a GitOps tool like Argo CD) are the source of truth.
+
+### Autoscaling
+
+```bash
+make metrics-server   # once per cluster: the HPA needs CPU metrics
+kubectl -n edgar get hpa   # TARGETS shows current CPU vs. the 70% target (may say <unknown> for a minute)
+make load             # in another terminal: hammers /readyz (vector-store lookups, no model calls)
+make watch            # REPLICAS climbs toward 3 as CPU passes 70% of the 250m request
+# stop `make load` (Ctrl-C); about a minute later it scales back to 1
+```
+
+The HPA targets a percentage of the **CPU request**, which is why every container needs
+resource requests. The HPA is only in the kind overlay: on a multi-node cluster, extra API
+pods couldn't share the `ReadWriteOnce` volume (see the note above).

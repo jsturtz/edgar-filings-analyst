@@ -1,0 +1,23 @@
+# Scale the API between 1 and 3 pods on CPU. Requires metrics-server (`make metrics-server`).
+# kind only: the shared ReadWriteOnce volume works for extra pods because kind has one node.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: edgar-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: edgar-api
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70  # percent of the pod's CPU *request* (250m)
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60  # demo-friendly; production usually waits longer
