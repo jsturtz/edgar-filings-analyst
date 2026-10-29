@@ -91,7 +91,7 @@ make history          # the "bad config" revision is in the history, with its ch
 
 **Gotcha:** `rollout undo` means "go back one revision," so running it twice flips you back
 to the broken version. To be precise, roll back to a known-good number from `make history`:
-`make rollback REV=<n>`. Rolling back is the fast fix; **fixing forward** is the other option,
+`make rollback REV=<n>`. Two more quirks: rolling back *renumbers* (the restored revision gets a new number at the top, and its old number disappears), and CHANGE-CAUSE comes from an annotation on the Deployment, so it can carry over to the wrong revision. Verify with `kubectl -n edgar rollout history deploy/edgar-api --revision=<n>` before trusting a label. `make rollback` stamps its own change-cause to keep the history readable. Rolling back is the fast fix; **fixing forward** is the other option,
 undoing the bad change itself in a new revision (`make fix-config`).
 
 What you should see in `make watch`: the new pod starts, its readiness probe keeps returning

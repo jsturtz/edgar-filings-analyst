@@ -64,6 +64,7 @@ break-image:  ## Ship a tag that doesn't exist: new pod can't even start
 	kubectl -n $(NS) set image deploy/edgar-api api=edgar-analyst:does-not-exist
 
 rollback:  ## Roll back one revision (or to a specific one: make rollback REV=3). Running it twice flips back!
+	kubectl -n $(NS) annotate deploy/edgar-api kubernetes.io/change-cause="rollback$(if $(REV), to revision $(REV),)" --overwrite
 	kubectl -n $(NS) rollout undo deploy/edgar-api $(if $(REV),--to-revision=$(REV),)
 	@sleep 3  # let the controller observe the undo before reading rollout status
 	kubectl -n $(NS) rollout status deploy/edgar-api --timeout=240s
