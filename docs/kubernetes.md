@@ -89,6 +89,11 @@ make rollback         # back to the previous revision; the broken pod is removed
 make history          # the "bad config" revision is in the history, with its change-cause
 ```
 
+**Gotcha:** `rollout undo` means "go back one revision," so running it twice flips you back
+to the broken version. To be precise, roll back to a known-good number from `make history`:
+`make rollback REV=<n>`. Rolling back is the fast fix; **fixing forward** is the other option,
+undoing the bad change itself in a new revision (`make fix-config`).
+
 What you should see in `make watch`: the new pod starts, its readiness probe keeps returning
 503 ("SEC cache ... is empty; run ingest"), the old pod is never terminated, and after 180 s
 (`progressDeadlineSeconds`) the Deployment's `Progressing` condition turns false. That
@@ -97,9 +102,12 @@ condition is what a CI/CD pipeline watches to fail a deploy automatically.
 `make break-image` is the other common failure: a tag that doesn't exist gives
 `ErrImageNeverPull` or `ImagePullBackOff`. It's contained the same way, and recovered with `make rollback`.
 
-`kubectl set env` and `kubectl set image` change the live cluster but not git. After
-experimenting, `make resync` re-applies the manifests so the cluster matches the repo again.
-In a real team, the manifests in git (or a GitOps tool like Argo CD) are the source of truth.
+`kubectl set env` and `kubectl set image` change the live cluster but not git, which is
+*drift*. `kubectl apply` (`make resync`) restores fields the manifests manage, like the image
+tag, but it won't remove an env var the manifests never mentioned, because apply only manages
+the fields in its own configuration. That's why kubectl warns about rolling back a resource
+"managed with kubectl apply." In a real team the manifests in git are the source of truth and
+changes go through them (or a GitOps tool like Argo CD), not through `kubectl set`.
 
 ### Autoscaling
 

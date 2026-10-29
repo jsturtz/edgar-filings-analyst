@@ -4,7 +4,7 @@ CLUSTER ?= edgar
 NS      ?= edgar
 OVERLAY ?= deploy/k8s/overlays/kind
 
-.PHONY: help kind-up image secret deploy ingest-logs reingest status port-forward logs kind-down metrics-server rollout-status history break-config break-image rollback resync load watch
+.PHONY: help kind-up image secret deploy ingest-logs reingest status port-forward logs kind-down metrics-server rollout-status history break-config break-image rollback fix-config resync load watch
 
 help:  ## Show targets
 	@grep -E "^[a-z-]+:.*##" $(MAKEFILE_LIST) | sed "s/:.*##/:/"
@@ -63,11 +63,17 @@ break-image:  ## Ship a tag that doesn't exist: new pod can't even start
 	kubectl -n $(NS) annotate deploy/edgar-api kubernetes.io/change-cause="bad image tag" --overwrite
 	kubectl -n $(NS) set image deploy/edgar-api api=edgar-analyst:does-not-exist
 
-rollback:  ## Roll back to the previous revision
-	kubectl -n $(NS) rollout undo deploy/edgar-api
+rollback:  ## Roll back one revision (or to a specific one: make rollback REV=3). Running it twice flips back!
+	kubectl -n $(NS) rollout undo deploy/edgar-api $(if $(REV),--to-revision=$(REV),)
+	@sleep 3  # let the controller observe the undo before reading rollout status
 	kubectl -n $(NS) rollout status deploy/edgar-api --timeout=240s
 
-resync:  ## Re-apply the manifests so the cluster matches git again (undo kubectl set drift)
+fix-config:  ## Fix forward instead of rolling back: remove the bad env var from the live Deployment
+	kubectl -n $(NS) set env deploy/edgar-api EDGAR_DATA_DIR-
+	@sleep 3
+	kubectl -n $(NS) rollout status deploy/edgar-api --timeout=240s
+
+resync:  ## Re-apply the manifests (restores fields git manages, like the image; NOT env vars added by kubectl set)
 	kubectl apply -k $(OVERLAY)
 
 load:  ## Generate CPU load for the HPA (hits /readyz, which runs a vector-store lookup; no model calls)
